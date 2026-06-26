@@ -38,6 +38,21 @@ This spends real money on a real account, so two points are non-negotiable:
 Everything else (search, batch pricing, `cart get`, `checkout create`, `checkout slots`,
 `set-delivery`) is reversible and fine to run as you work toward those two checkpoints.
 
+### Spending cap (defense in depth)
+
+On top of the two gates, put a hard euro ceiling on every cart/checkout command with `--max <eur>`,
+so a wrong product match or a fat-fingered quantity can't quietly run up a huge order. Choose the cap:
+
+- the user's stated budget if they gave one ("máximo 80€", "no más de 100"); otherwise
+- the agreed plan total from Gate 1, rounded up with a small margin.
+
+Any `cart add/set` or `checkout create/set-delivery/submit` whose total would exceed `--max` fails
+with `error: BUDGET EXCEEDED …` and a non-zero exit, so you stop instead of overspending. `submit`
+fails **closed**: with a cap set, if it can't read the order total it refuses rather than pay. Treat a
+budget error as **stop-and-report** — only raise the cap if the user explicitly raises the budget.
+(You can also set it once for the run: `MERCADONA_MAX_EUR`, or `[limits].max_eur` in
+`~/.mercadona/config.toml`; precedence is flag > env > config.)
+
 ## Locate the binary
 
 Use `mercadona` from `PATH` if present. Otherwise the source repo is
@@ -62,15 +77,17 @@ durable setup is one browser login, then the CLI runs unattended.
 **Durable path (recommended) — one browser login, then headless forever:**
 1. The user logs in once at `tienda.mercadona.es` in their **own local browser** (not a
    datacenter/Cloud browser — reCAPTCHA Enterprise scores datacenter IPs low and returns 412).
-2. In DevTools, grab the **`refresh_token`** from the `POST /api/auth/tokens/` response
-   (Network tab) or from local storage.
-3. Seed it (stdin keeps the secret out of argv):
+   Either method works — email/password or "Sign in with Google".
+2. Easiest: DevTools → Network → **Export HAR…**, then let the CLI extract the refresh token:
    ```bash
-   printf '%s' '<refresh_token>' | mercadona set-refresh --stdin
+   mercadona import-har --file tienda.mercadona.es.har
    ```
-   From then on every authenticated call auto-refreshes on a `401 token_not_valid` and retries —
-   no browser, no captcha. (Equivalent: put `refresh_token` under `[auth]` in
-   `~/.mercadona/config.toml`, 0600.)
+   It pulls the `refresh_token` (works for both login methods) into `~/.mercadona/config.toml` and
+   caches the session — never reading the password. (Manual alternative: grab the `refresh_token`
+   from the `POST /api/auth/tokens/` response or local storage and seed it with
+   `printf '%s' '<refresh_token>' | mercadona set-refresh --stdin`.)
+3. From then on every authenticated call auto-refreshes on a `401 token_not_valid` and retries —
+   no browser, no captcha.
 
 **Quick one-off — import a browser session:** in a logged-in tab, DevTools → Network → any
 `…/api/customers/…` request → Copy → Copy as cURL → save to a file →
@@ -117,10 +134,13 @@ you guessed. Then wait for the user's go-ahead. This is the confirm-before-cart 
 ### 3. Fill the cart (after the OK)
 
 ```bash
-mercadona cart add 10381 1     # add 1× product 10381 (adds to existing qty)
-mercadona cart set 30167 2     # set absolute qty (0 removes the line)
-mercadona cart get             # verify: lines + total
+mercadona cart add 10381 1 --max 80   # add 1× product 10381 (fails if cart total would exceed 80€)
+mercadona cart set 30167 2 --max 80   # set absolute qty (0 removes the line)
+mercadona cart get                    # verify: lines + total
 ```
+
+Pass `--max <budget>` on every mutating command (see *Spending cap* above) — the cap is your
+backstop against a fuzzy match or wrong quantity ballooning the order.
 
 `cart add` is additive; `cart set` is absolute. After filling, run `cart get` and reconcile
 the line set + total against your plan before moving on.
@@ -135,9 +155,9 @@ lag. (Verified live: two chained `set … 0` removals raced and one item reappea
 ### 4. Prepare delivery checkout (reversible)
 
 ```bash
-mercadona checkout create --json            # → checkout id + default address (embedded)
+mercadona checkout create --json --max 80   # → checkout id + default address (embedded)
 mercadona checkout slots --address <id> --json   # delivery slots for that address
-mercadona checkout set-delivery --checkout <chk> --address <addr> --slot <slot>
+mercadona checkout set-delivery --checkout <chk> --address <addr> --slot <slot> --max 80
 ```
 
 `checkout create` returns the checkout `id` and the default delivery address (slots are NOT
@@ -155,7 +175,7 @@ Show the final order: line items, subtotal, delivery fee, total, and the chosen 
 the user explicitly confirms *this* order:
 
 ```bash
-mercadona checkout submit --checkout <chk> --yes   # IRREVERSIBLE — places the order
+mercadona checkout submit --checkout <chk> --max 80 --yes   # IRREVERSIBLE — places the order (refuses if total > 80€)
 ```
 
 If you have any doubt about consent, stop and ask. A prepared-but-unsubmitted checkout is

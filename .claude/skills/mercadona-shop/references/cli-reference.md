@@ -2,7 +2,7 @@
 
 Exact command surface and output shapes. Data goes to **stdout**, logs/errors to **stderr**,
 exit code `1` on error — safe to pipe and parse. Add `--json` to any command for machine
-output. Common flags go right after the (sub)command: `--wh mad1`, `--lang es`, `--json`.
+output. Common flags may appear anywhere after the (sub)command: `--wh mad1`, `--lang es`, `--json`.
 
 ## Read commands (anonymous — no login)
 
@@ -48,6 +48,7 @@ Ids are **per-warehouse** — an id from a different `--wh` may 404.
 
 | Command | Purpose |
 | --- | --- |
+| `mercadona import-har [--file f]` | **preferred** — extract the refresh token from a browser HAR → headless forever |
 | `mercadona set-refresh <token>` (or `--stdin`) | seed a refresh token → headless auto-refresh forever |
 | `mercadona import-curl [--file f]` | import a browser session (access token + cookie); **no** refresh |
 | `mercadona login [--user E] [--password-stdin] [--save]` | password login — **needs a browser reCAPTCHA**, fails headless |
@@ -56,6 +57,12 @@ Ids are **per-warehouse** — an id from a different `--wh` may 404.
 Password login requires a Google reCAPTCHA Enterprise token, so it can't be done headlessly —
 the first login is a browser step. The **refresh token** then renews the session with no
 captcha (it rotates on each use), which is the durable, unattended credential.
+
+**import-har** is the easiest durable setup: export a HAR (DevTools → Network → Export HAR…) after
+logging in by **either** method, and it extracts the `refresh_token` (+ access token, cookie, customer
+id) into `~/.mercadona/config.toml`, never reading the password. Email login posts to
+`/api/auth/tokens/`; "Sign in with Google" posts to `/api/auth/social/google/` — both return a refresh
+token, and import-har handles either.
 
 **set-refresh** writes `[auth] refresh_token` to `~/.mercadona/config.toml` (0600). Get the
 token from one browser login (DevTools → the `POST /api/auth/tokens/` response, or local
@@ -79,8 +86,8 @@ the token's `customer_uuid` claim — the literal `me` alias is rejected (403).
 | Command | Purpose |
 | --- | --- |
 | `mercadona cart get` | show current cart |
-| `mercadona cart add <product_id> <qty>` | add qty to a product's existing quantity |
-| `mercadona cart set <product_id> <qty>` | set absolute qty (`0` removes the line) |
+| `mercadona cart add <product_id> <qty> [--max EUR]` | add qty to a product's existing quantity |
+| `mercadona cart set <product_id> <qty> [--max EUR]` | set absolute qty (`0` removes the line) |
 
 `qty` is a float — unit items use `1`, `2`…; weight/bulk items accept fractions (`0.5`).
 
@@ -107,10 +114,10 @@ Read (GET) nests the product under each line; the CLI normalizes to a flat produ
 | Command | Purpose |
 | --- | --- |
 | `mercadona checkout addresses` | list saved delivery addresses |
-| `mercadona checkout create` | open a checkout from the cart → id + default address |
+| `mercadona checkout create [--max EUR]` | open a checkout from the cart → id + default address |
 | `mercadona checkout slots --address <id>` | delivery slots for an address |
-| `mercadona checkout set-delivery --checkout <id> --address <id> --slot <id>` | attach address + slot |
-| `mercadona checkout submit --checkout <id> --yes` | **place the order (irreversible)** |
+| `mercadona checkout set-delivery --checkout <id> --address <id> --slot <id> [--max EUR]` | attach address + slot |
+| `mercadona checkout submit --checkout <id> [--max EUR] --yes` | **place the order (irreversible)** |
 
 ### Flow + shapes
 
@@ -125,11 +132,19 @@ Read (GET) nests the product under each line; the CLI normalizes to a flat produ
 4. `checkout submit --checkout <chk> --yes` → places the order. Without `--yes` the CLI refuses.
    The **minimum order is 60€** (enforced live; bundle's "50" is wrong); delivery ≈ 8.20€.
 
+## Spending guard
+
+`--max <eur>` caps the spend: any `cart add/set` or `checkout create/set-delivery/submit` whose total
+exceeds it fails with `error: BUDGET EXCEEDED …` and exit 1. `checkout submit` fails **closed** — with
+a cap set, if the order total can't be read it refuses rather than pay. Also settable as
+`MERCADONA_MAX_EUR` or `[limits] max_eur` in config; precedence flag > env > config; `0`/unset = off.
+
 ## Config & state
 
 State lives in `~/.mercadona/` (override with `MERCADONA_CONFIG_DIR`):
 
-- `config.toml` — `[auth]` username/password/refresh_token, `[defaults]` warehouse/lang (0600).
+- `config.toml` — `[auth]` username/password/refresh_token, `[defaults]` warehouse/lang,
+  `[limits] max_eur` (spending cap) (0600).
   Only `refresh_token` actually yields a headless session; stored `username`/`password` can't
   auto-login (the login call omits the reCAPTCHA token the API requires → 412/400).
 - `token.json` — cached bearer + refresh + cookie (machine-managed).
