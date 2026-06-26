@@ -10,6 +10,7 @@ func TestExtractTotal(t *testing.T) {
 		ok   bool
 	}{
 		{"cart summary string", `{"summary":{"total":"76.84"}}`, 76.84, true},
+		{"live checkout: summary.total + bare-string price", `{"summary":{"products":"68.64","slot":"8.20","total":"76.84"},"price":"68.64","total":null}`, 76.84, true},
 		{"checkout price number", `{"price":{"total":129.5}}`, 129.5, true},
 		{"top-level total string", `{"total":"12.30"}`, 12.30, true},
 		{"summary preferred over price", `{"summary":{"total":"10.00"},"price":{"total":"99.00"}}`, 10.00, true},

@@ -599,7 +599,7 @@ func cmdCart(args []string) error {
 
 func cmdCheckout(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: mercadona checkout <addresses|slots|create|set-delivery|submit> [flags]")
+		return fmt.Errorf("usage: mercadona checkout <get|addresses|slots|create|set-delivery|submit> [flags]")
 	}
 	sub, rest := args[0], args[1:]
 	fs := flag.NewFlagSet("checkout", flag.ExitOnError)
@@ -615,6 +615,15 @@ func cmdCheckout(args []string) error {
 		return err
 	}
 	switch sub {
+	case "get":
+		if *checkoutID == "" {
+			return fmt.Errorf("need --checkout <id>")
+		}
+		raw, err := cl.GetCheckout(*checkoutID)
+		if err != nil {
+			return err
+		}
+		return emitRaw(raw)
 	case "addresses":
 		raw, err := cl.Addresses()
 		if err != nil {
@@ -845,6 +854,7 @@ AUTHENTICATED COMMANDS (bring your own credentials):
   cart get                show current cart (raw JSON)
   cart add <id> <qty>     add qty of a product to the cart
   cart set <id> <qty>     set a product's absolute qty (0 removes)
+  checkout get            --checkout <id>   show a checkout (id, total, address, slot)
   checkout addresses      list delivery addresses
   checkout create         open a checkout from the cart (returns id + default address)
   checkout slots          --address <id>   list delivery slots for an address

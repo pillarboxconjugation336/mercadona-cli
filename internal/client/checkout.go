@@ -60,43 +60,56 @@ func (c *Client) SubmitOrder(checkoutID string) (json.RawMessage, error) {
 	return raw, c.DoJSON("POST", c.custURL("checkouts/"+checkoutID+"/orders/"), nil, &raw)
 }
 
-// money parses a price the API sends as either a JSON string ("76.84") or a
-// number, into euros.
-type money float64
-
-func (m *money) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), `"`)
-	if s == "" || s == "null" {
-		return nil
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return nil // tolerate unexpected shapes; ExtractTotal then reports "not found"
-	}
-	*m = money(f)
-	return nil
-}
-
 // ExtractTotal pulls the order/cart total (in €) out of a cart or checkout JSON
-// response, tolerating the shapes the API uses (summary.total, price.total, or a
-// top-level total). Returns false when no positive total could be read.
+// response. It reads field-by-field and leniently: a live checkout carries the
+// payable total at summary.total ("76.84" = products 68.64 + slot 8.20) but also a
+// bare-string "price" subtotal ("68.64") — decoding the whole thing into one struct
+// errors on that string and would discard summary.total, so each candidate is
+// parsed on its own. Returns false when no positive total is found. (Field shape
+// verified against a live checkout, 2026-06-26.)
 func ExtractTotal(raw json.RawMessage) (float64, bool) {
-	var v struct {
-		Total   money `json:"total"`
-		Summary struct {
-			Total money `json:"total"`
-		} `json:"summary"`
-		Price struct {
-			Total money `json:"total"`
-		} `json:"price"`
-	}
-	if json.Unmarshal(raw, &v) != nil {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(raw, &top) != nil {
 		return 0, false
 	}
-	for _, t := range []money{v.Summary.Total, v.Price.Total, v.Total} {
-		if t > 0 {
-			return float64(t), true
-		}
+	if t, ok := totalField(top["summary"]); ok { // authoritative for carts + checkouts
+		return t, true
+	}
+	if t, ok := parseMoney(top["total"]); ok { // some shapes carry a top-level total
+		return t, true
+	}
+	if t, ok := totalField(top["price"]); ok { // fallback only if price is an object
+		return t, true
 	}
 	return 0, false
+}
+
+// totalField parses the "total" key of a JSON object value; false if the value
+// isn't an object (e.g. a bare string) or has no positive total.
+func totalField(obj json.RawMessage) (float64, bool) {
+	if len(obj) == 0 {
+		return 0, false
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(obj, &m) != nil {
+		return 0, false
+	}
+	return parseMoney(m["total"])
+}
+
+// parseMoney reads a euro amount the API sends as a JSON string ("76.84") or a
+// number; false for empty/null/non-numeric/non-positive.
+func parseMoney(b json.RawMessage) (float64, bool) {
+	if len(b) == 0 {
+		return 0, false
+	}
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || f <= 0 {
+		return 0, false
+	}
+	return f, true
 }
