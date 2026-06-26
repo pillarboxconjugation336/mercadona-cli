@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	neturl "net/url"
 	"strings"
 
 	"github.com/ivorjpc/mercadona/internal/config"
@@ -22,6 +23,12 @@ type HARSession struct {
 	Cookie       string
 	CustomerID   string
 	LoginKind    string // "password", "google/social", or "headers"
+	// Warehouse/Lang are the values the browser session was actually using,
+	// read from the ?wh=/?lang= query params on captured /api/ requests. They
+	// reflect the warehouse Mercadona assigned to the user's delivery address,
+	// so importing the HAR can pin the CLI to the right per-warehouse catalog.
+	Warehouse string
+	Lang      string
 }
 
 // ParseHAR scans a HAR for the most recent Mercadona session: the access +
@@ -88,8 +95,17 @@ func ParseHAR(data []byte) (HARSession, error) {
 			}
 		}
 
-		// Authenticated API requests carry the freshest Bearer token + Akamai cookie.
+		// Authenticated API requests carry the freshest Bearer token + Akamai
+		// cookie, and the wh/lang the session was browsing (last one wins).
 		if strings.Contains(url, "mercadona.es/api/") {
+			if u, perr := neturl.Parse(url); perr == nil {
+				if w := u.Query().Get("wh"); w != "" {
+					s.Warehouse = w
+				}
+				if l := u.Query().Get("lang"); l != "" {
+					s.Lang = l
+				}
+			}
 			for _, h := range e.Request.Headers {
 				switch strings.ToLower(h.Name) {
 				case "authorization":

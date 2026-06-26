@@ -12,7 +12,7 @@ before:
 
 builds:
   - id: mercadona
-    main: .
+    main: ./cmd/mercadona
     binary: mercadona
     env:
       - CGO_ENABLED=0 # pure-Go deps (utls/toml) → static, trivially cross-compiled

@@ -32,7 +32,7 @@ Override with `MERCADONA_VERSION=v0.1.0` (pin a tag) or `MERCADONA_INSTALL_DIR=/
 **From source** (Go 1.26+) — clone, then:
 
 ```bash
-go build -o mercadona .
+go build -o mercadona ./cmd/mercadona
 ```
 
 (`go install <module>@latest` isn't wired up yet: the module path is
@@ -54,6 +54,18 @@ mercadona categories --id 112 --json         # one category's products (raw JSON
 
 Common flags: `--wh mad1` (warehouse), `--lang es`, `--json` — and they can go anywhere after the (sub)command, not just up front.
 Data goes to **stdout**, logs/errors to **stderr**, exit code `1` on error — friendly to scripts and agents.
+
+### Location (warehouse) — set it from your postal code
+
+```bash
+mercadona set-postal 28022   # → resolves to warehouse mad1, saves it as the default
+```
+
+Product ids **and prices** are per-warehouse, and online checkout needs the cart's warehouse to
+match your delivery address — so pin it to the warehouse that serves your postal code (no login
+needed). Precedence: `--wh` flag > `config.toml [defaults]` > built-in `mad1`. `import-har` also
+auto-detects and saves the warehouse from your session. (Within a city it varies: `28022 → mad1`,
+`28013 → mad3`.)
 
 Example:
 
@@ -100,7 +112,8 @@ Prefer to do it by hand? Write the token yourself — `mercadona set-refresh <to
 [auth]
 refresh_token = "<your refresh token>"   # the durable, headless-renewable credential
 [defaults]
-warehouse = "mad1"
+warehouse = "mad1"        # or: `mercadona set-postal 28022` resolves + writes this for you
+postal_code = "28022"
 ```
 
 `MERCADONA_TOKEN`/`MERCADONA_COOKIE`/`MERCADONA_CUSTOMER` (and `MERCADONA_USER`/`MERCADONA_PASS`) env vars also work for one-off runs.
@@ -183,7 +196,8 @@ Three layers, by IP-sensitivity:
 State lives in `~/.mercadona/` (override with `MERCADONA_CONFIG_DIR`):
 
 - `config.toml` — user-authored (`0600`): `[auth] refresh_token` (+ optional `username`/`password`),
-  `[defaults] warehouse`/`lang`, `[limits] max_eur`.
+  `[defaults] warehouse`/`lang`/`postal_code` (honoured by every command; set via `set-postal`),
+  `[limits] max_eur`.
 - `token.json` — cached session: access + refresh token + cookie (machine-managed).
 - `algolia.json` — cached/auto-refreshed search credentials.
 

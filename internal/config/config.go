@@ -33,8 +33,9 @@ type Config struct {
 		RefreshToken string `toml:"refresh_token"`
 	} `toml:"auth"`
 	Defaults struct {
-		Warehouse string `toml:"warehouse"`
-		Lang      string `toml:"lang"`
+		Warehouse  string `toml:"warehouse"`
+		Lang       string `toml:"lang"`
+		PostalCode string `toml:"postal_code"` // human-meaningful source; warehouse is derived from it
 	} `toml:"defaults"`
 	Limits struct {
 		MaxEUR float64 `toml:"max_eur"` // refuse carts/checkouts over this total (0 = no limit)

@@ -10,11 +10,20 @@ output. Common flags may appear anywhere after the (sub)command: `--wh mad1`, `-
 | --- | --- |
 | `mercadona search <term...> [--limit N]` | full-text product search (Algolia) |
 | `mercadona batch [-f file] [--hits N]` | search many terms in ONE request (~100/call) |
+| `mercadona total [-f file]` | deterministic basket total from `<id> [qty]` lines (CLI sums it) |
 | `mercadona product <id>` | product detail + price |
 | `mercadona categories [--id N]` | category tree, or one category's products |
 
 `batch` reads one term per line from `-f <file>` (`-f -` = stdin) or positional args. Lines
 starting with `#` are skipped. Default returns the top hit per term (`--hits` for more).
+
+`total` reads `<id> [qty]` per line (`-f <file>`/`-f -` = stdin; `#` comments skipped) — or bare
+ids as positional args (qty 1 each). It fetches each product's price **in the configured/`--wh`
+warehouse** and sums `unit_price × qty` in integer cents, so the pre-cart estimate is exact and
+reproducible instead of hand-added; qty may be fractional for weight/bulk items. A line whose id
+can't be priced is reported and excluded, and the command exits non-zero. `--json` →
+`{lines:[{id,name,qty,unit_price,subtotal}], total, count, complete}`. The authoritative total is
+still the cart/checkout API (`ExtractTotal`); `total` is the no-login estimate before Gate 1.
 
 ### Search hit shape (`--json`)
 
@@ -43,6 +52,20 @@ starting with `#` are skipped. Default returns the top hit per term (`--hits` fo
 `id` is the product id you pass to `cart add`/`set`. `unit_price` is the price you pay for the
 item as sold; `reference_price`/`reference_format` is the per-unit comparison (e.g. 0.960 €/L).
 Ids are **per-warehouse** — an id from a different `--wh` may 404.
+
+## Location (warehouse selection)
+
+Product ids **and prices** are per-warehouse, and online checkout needs the cart's warehouse to
+match the delivery address — so the warehouse must be the one that serves the user's postal code.
+
+| Command | Purpose |
+| --- | --- |
+| `mercadona set-postal <cp>` | resolve `cp` → warehouse (via `POST /api/postal-codes/actions/change-pc/`, reading the `x-customer-wh` header) and save both `postal_code` + `warehouse` to `[defaults]`; **no login needed** |
+
+Active warehouse/lang precedence: explicit `--wh`/`--lang` flag > `config.toml [defaults]` >
+built-in `mad1`/`es`. `import-har` also auto-detects the warehouse (and lang) from the captured
+session and saves it to `[defaults]`. An undeliverable postal code errors (no warehouse returned)
+and leaves config untouched. Example: `28022 → mad1`, `28013 → mad3` (same city, different centre).
 
 ## Auth commands (bring-your-own credentials)
 
@@ -143,8 +166,9 @@ a cap set, if the order total can't be read it refuses rather than pay. Also set
 
 State lives in `~/.mercadona/` (override with `MERCADONA_CONFIG_DIR`):
 
-- `config.toml` — `[auth]` username/password/refresh_token, `[defaults]` warehouse/lang,
-  `[limits] max_eur` (spending cap) (0600).
+- `config.toml` — `[auth]` username/password/refresh_token, `[defaults]` warehouse/lang/postal_code,
+  `[limits] max_eur` (spending cap) (0600). `[defaults]` is honoured by every command — set it with
+  `set-postal` (or `import-har`'s auto-detect); flag `--wh`/`--lang` overrides it per command.
   Only `refresh_token` actually yields a headless session; stored `username`/`password` can't
   auto-login (the login call omits the reCAPTCHA token the API requires → 412/400).
 - `token.json` — cached bearer + refresh + cookie (machine-managed).

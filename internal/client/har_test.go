@@ -66,6 +66,27 @@ func TestParseHAR_Base64Body(t *testing.T) {
 	}
 }
 
+// the wh/lang the browser was using come from the ?wh=/?lang= query params on
+// captured /api/ requests, with the last (freshest) request winning.
+func TestParseHAR_WarehouseLang(t *testing.T) {
+	har := `{"log":{"entries":[
+	  {"request":{"url":"https://tienda.mercadona.es/api/categories/?lang=es&wh=mad1","headers":[{"name":"Authorization","value":"Bearer AAA"}]},
+	   "response":{"status":200,"content":{"text":"{}"}}},
+	  {"request":{"url":"https://tienda.mercadona.es/api/products/123/?lang=ca&wh=bcn1","headers":[{"name":"Authorization","value":"Bearer BBB"}]},
+	   "response":{"status":200,"content":{"text":"{}"}}}
+	]}}`
+	s, err := ParseHAR([]byte(har))
+	if err != nil {
+		t.Fatalf("ParseHAR: %v", err)
+	}
+	if s.Warehouse != "bcn1" { // last request wins
+		t.Errorf("warehouse = %q, want bcn1", s.Warehouse)
+	}
+	if s.Lang != "ca" {
+		t.Errorf("lang = %q, want ca", s.Lang)
+	}
+}
+
 // a HAR with no Mercadona auth material is a clear error, not a silent empty session.
 func TestParseHAR_Empty(t *testing.T) {
 	if _, err := ParseHAR([]byte(`{"log":{"entries":[]}}`)); err == nil {

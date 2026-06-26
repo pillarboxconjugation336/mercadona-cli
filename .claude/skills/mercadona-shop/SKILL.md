@@ -55,16 +55,16 @@ budget error as **stop-and-report** — only raise the cap if the user explicitl
 
 ## Locate the binary
 
-Use `mercadona` from `PATH` if present. Otherwise the source repo is
-`/Users/ivor/src/tries/2026-06-25-mercadona` — build once and run the local binary:
+Run `mercadona` from `PATH`. If it isn't installed, install it (npm `@ivorpad/mercadona`, the
+`curl | sh` script, or a GitHub release — see the project README) and confirm with `mercadona
+version`. Never hardcode a local path or a build-from-source step: this skill ships to every
+CLI user, not one machine.
 
-```bash
-cd /Users/ivor/src/tries/2026-06-25-mercadona && go build -o mercadona . && ./mercadona version
-```
-
-Default warehouse/language are `mad1`/`es`. Override per-command with `--wh`/`--lang` (e.g.
-`--wh bcn1`) if the user is not in Madrid. Product ids are **per-warehouse**, so price and
-shop in the same warehouse the user will receive delivery in.
+Pin the warehouse to the user's area — ids and prices are **per-warehouse**. Ask their postal
+code and run `mercadona set-postal <cp>` once: it resolves and saves the right warehouse as the
+default (no login needed). Without it the default is `mad1` (Madrid); you can still override
+per-command with `--wh`/`--lang` (e.g. `--wh bcn1`). Always price and shop in the warehouse
+that will actually deliver.
 
 ## Authenticate (bring-your-own credentials)
 
@@ -106,6 +106,20 @@ print tokens or cookies back to the user.
 
 ## The shopping workflow
 
+### 0. Scope the shop before pricing (ask first)
+
+Don't assume — get the two things that decide the basket before resolving anything:
+
+- **For how many people?** A recipe scales: "paella" for 2 is not the same shop as for 6. Ask
+  (e.g. "¿para cuántas personas?") and size every quantity from the answer; never default silently
+  to a number.
+- **The list itself.** Accept a typed list *or a photo* of one (read it, then confirm what you
+  parsed). If the user only names a dish, propose an ingredient list for their headcount and let
+  them adjust it before you price.
+
+Treat the resolved plan as editable — users routinely tweak brand, size or quantity. Loop on that
+until they're happy, *before* any cart action.
+
 ### 1. Resolve the list to real products (free, no login)
 
 Price the whole list in one request with `batch` — one term per line, ~100 items per call:
@@ -122,14 +136,23 @@ relevance on a bare word is loose (a search for "carne" can top-rank a pepper pa
 - When genuinely ambiguous, show the user 2-3 options and let them choose rather than guessing.
 - Use `--json` when you need to parse ids/prices reliably; the default output is for humans.
 
-Note quantities: many items are by unit, but weight/bulk items (fruit, deli) price per kg and
-accept fractional quantity (e.g. `0.5`).
+Note quantities: scale them to the headcount from step 0. Many items are by unit, but weight/bulk
+items (fruit, deli) price per kg and accept fractional quantity (e.g. `0.5`).
 
 ### 2. Present the plan and get the OK (Gate 1)
 
 Before touching the cart, show a compact table: each list item → chosen product (`[id] name —
-size — unit price`) and a line quantity + subtotal, plus an estimated total. Call out anything
-you guessed. Then wait for the user's go-ahead. This is the confirm-before-cart gate.
+size — unit price`) and a line quantity. **Compute the total with code, never by hand** — feed the
+resolved `<id> <qty>` lines to `mercadona total` and quote its figure (it sums `unit_price × qty`
+deterministically, in the right warehouse):
+
+```bash
+printf '5044 1\n2779 2\n24181 1\n' | mercadona total -f -   # → per-line subtotals + total
+```
+
+Call out anything you guessed. Then wait for the user's go-ahead — and if they want changes, edit
+the plan and re-run `total`. This is the confirm-before-cart gate. (The cart/checkout API total is
+the authoritative one once items are in the cart; `total` is the pre-cart estimate.)
 
 ### 3. Fill the cart (after the OK)
 
