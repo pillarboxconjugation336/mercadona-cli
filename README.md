@@ -112,6 +112,14 @@ State lives under the OS config dir (`~/Library/Application Support/mercadona` o
 - `algolia.json` — cached/refreshed search credentials.
 - `token.json` — cached bearer token (added with the auth commands).
 
+## Claude skill
+
+This repo bundles a Claude Code skill, **`mercadona-shop`** (`.claude/skills/mercadona-shop/`),
+that drives this CLI to do the grocery shop: turn a list into priced products, fill the cart,
+prepare delivery checkout, and place the order only on explicit user consent. Install it where
+your Claude reads skills (symlink or copy `.claude/skills/mercadona-shop` into `~/.claude/skills/`);
+it points back at this binary, so build the CLI first.
+
 ## Status
 
 Read core (`search`, `batch`, `product`, `categories`) + authenticated leg
