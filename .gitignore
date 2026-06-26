@@ -5,3 +5,9 @@
 
 # local scratch
 /scratchpad/
+
+# npm wrapper: downloaded-at-install binary + deps (the JS sources stay tracked)
+/npm/node_modules/
+/npm/bin/mercadona
+/npm/bin/mercadona.exe
+/npm/*.tgz

@@ -7,11 +7,36 @@ deps, structured `--json` output for programmatic/agent use.
 > Unofficial. Mercadona has no public API. Bring your own credentials; use at a
 > sane request rate. This talks to the same HTTP endpoints the website does.
 
-## Build
+## Install
+
+**npm** — downloads the prebuilt binary for your platform on install:
+
+```bash
+npm install -g @ivorpad/mercadona      # puts `mercadona` on your PATH
+npx @ivorpad/mercadona search queso    # …or run without installing
+```
+
+**curl** (macOS / Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ivorpad/mercadona-cli/main/install.sh | sh
+```
+
+Override with `MERCADONA_VERSION=v0.1.0` (pin a tag) or `MERCADONA_INSTALL_DIR=/path`
+(install location; defaults to `/usr/local/bin`, else `~/.local/bin`).
+
+**Manual** — download a tarball for your OS/arch from the
+[releases page](https://github.com/ivorpad/mercadona-cli/releases), extract, and put
+`mercadona` on your PATH.
+
+**From source** (Go 1.26+) — clone, then:
 
 ```bash
 go build -o mercadona .
 ```
+
+(`go install <module>@latest` isn't wired up yet: the module path is
+`github.com/ivorjpc/mercadona`, which doesn't match the repo URL.)
 
 ## Commands
 
@@ -127,3 +152,28 @@ Read core (`search`, `batch`, `product`, `categories`) + authenticated leg
 self-refresh, uTLS fingerprint, and the auth plumbing are verified live; the
 cart/checkout bodies await a real-session run (`import-curl` → `whoami` → `cart get`).
 `checkout submit` is gated behind `--yes`.
+
+## Releasing
+
+Push a semver tag — GitHub Actions
+([`.github/workflows/release.yml`](.github/workflows/release.yml)) cross-compiles with
+[GoReleaser](https://goreleaser.com), publishes a GitHub Release (per-OS/arch archives +
+`checksums.txt`), then publishes the npm wrapper that downloads from it.
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+**One-time setup** — add an Actions secret (repo → Settings → Secrets and variables → Actions):
+
+- `NPM_TOKEN` — an npm automation token with publish rights to the `@ivorpad` scope.
+
+Dry-run the build locally (no publish; artifacts land in `./dist`):
+
+```bash
+goreleaser release --snapshot --clean --skip=publish
+```
+
+**Homebrew** is prewired but disabled — to turn on `brew install ivorpad/tap/mercadona`,
+follow the commented `brews:` block in [`.goreleaser.yaml`](.goreleaser.yaml) (needs a
+`homebrew-tap` repo + a `HOMEBREW_TAP_GITHUB_TOKEN` secret).

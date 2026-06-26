@@ -1,0 +1,83 @@
+# GoReleaser config — cross-compiles the CLI and publishes a GitHub Release
+# (binaries + checksums) that the curl installer and the npm package download from.
+# Run locally:  goreleaser release --snapshot --clean --skip=publish
+# Release (CI):  push a tag `vX.Y.Z` → .github/workflows/release.yml runs this.
+version: 2
+
+project_name: mercadona
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mercadona
+    main: .
+    binary: mercadona
+    env:
+      - CGO_ENABLED=0 # pure-Go deps (utls/toml) → static, trivially cross-compiled
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X main.date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: default
+    # Asset name the installer (install.sh) and npm package (npm/lib/download.js)
+    # both reconstruct — keep these three in sync if you change it.
+    #   mercadona_<version>_<os>_<arch>.tar.gz   (zip on windows)
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+
+release:
+  github:
+    owner: ivorpad
+    name: mercadona-cli
+  draft: false
+  prerelease: auto
+
+# Homebrew — deferred. To enable `brew install ivorpad/tap/mercadona`:
+#   1. create the repo  github.com/ivorpad/homebrew-tap
+#   2. add a repo-scoped PAT as the Actions secret HOMEBREW_TAP_GITHUB_TOKEN
+#   3. uncomment below, and pass that env into the goreleaser step in release.yml
+# brews:
+#   - name: mercadona
+#     repository:
+#       owner: ivorpad
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     homepage: "https://github.com/ivorpad/mercadona-cli"
+#     description: "Unofficial, agent-friendly CLI for tienda.mercadona.es"
+#     license: "MIT"
+#     install: |
+#       bin.install "mercadona"
+#     test: |
+#       system "#{bin}/mercadona", "version"

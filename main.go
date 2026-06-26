@@ -21,7 +21,13 @@ import (
 	"github.com/ivorjpc/mercadona/internal/config"
 )
 
-const version = "0.0.1"
+// Build metadata, injected at release time via -ldflags (GoReleaser).
+// Defaults are for a local `go build`.
+var (
+	version = "dev"
+	commit  = ""
+	date    = ""
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -51,7 +57,7 @@ func main() {
 	case "checkout":
 		err = cmdCheckout(os.Args[2:])
 	case "version", "--version", "-v":
-		fmt.Println(version)
+		fmt.Println(versionString())
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -622,6 +628,18 @@ func collectTerms(file string, posArgs []string) ([]string, error) {
 		}
 	}
 	return terms, sc.Err()
+}
+
+// versionString renders the build version, appending the commit/date when they
+// were injected at release time (a local `go build` prints just "dev").
+func versionString() string {
+	if commit == "" {
+		return version
+	}
+	if date != "" {
+		return fmt.Sprintf("%s (%s, %s)", version, commit, date)
+	}
+	return fmt.Sprintf("%s (%s)", version, commit)
 }
 
 func usage() {
