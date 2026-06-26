@@ -1,0 +1,7 @@
+# build output
+/mercadona
+/dist/
+*.out
+
+# local scratch
+/scratchpad/
