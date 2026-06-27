@@ -185,28 +185,44 @@ closed**: with a cap set, if it can't read the order total it refuses rather tha
 > genuine price drops, build an allergen-safe basket. Every output below is **live CLI** — and since
 > reads need no login, most are copy-paste.
 
-### Price a whole list (and get cost-per-serving) — no login
+### Price a shopping list written in plain words
 
-`total` fetches each id's price and sums `unit_price × qty` **in integer cents** — exact,
-reproducible, and fractional quantities work for weight items. Divide by servings for €/plate.
+You think in names; the cart API thinks in ids. `batch` bridges them in **one request** — the top
+hit per term, with its price:
 
 ```console
-$ printf '5044 1\n60393 1\n85499 1\n16044 1\n4740 0.5\n' | mercadona total -f - --json
-{
-  "complete": true,
-  "count": 5,
-  "lines": [
-    { "id": "5044",  "name": "Arroz redondo Hacendado",               "qty": 1,   "unit_price": "1.20", "subtotal": "1.20" },
-    { "id": "60393", "name": "Gambón grande congelado",               "qty": 1,   "unit_price": "6.00", "subtotal": "6.00" },
-    { "id": "85499", "name": "Mejillón mediterráneo",                 "qty": 1,   "unit_price": "5.80", "subtotal": "5.80" },
-    { "id": "16044", "name": "Tomate triturado Hacendado",            "qty": 1,   "unit_price": "0.55", "subtotal": "0.55" },
-    { "id": "4740",  "name": "Aceite de oliva virgen extra Hacendado","qty": 0.5, "unit_price": "4.95", "subtotal": "2.48" }
-  ],
-  "total": "16.03"
-}
+$ printf 'arroz redondo hacendado\ngambón grande congelado\nmejillón mediterráneo\ntomate triturado hacendado\naceite oliva virgen extra hacendado\n' | mercadona batch -f -
+• arroz redondo hacendado  → [5044] Arroz redondo Hacendado — 1.20€ (1.200€/kg)
+• gambón grande congelado  → [60393] Gambón grande congelado — 6.00€ (12.000€/kg)
+• mejillón mediterráneo    → [85499] Mejillón mediterráneo — 5.80€ (5.800€/kg)
+• tomate triturado hacendado → [16044] Tomate triturado Hacendado — 0.55€ (1.375€/kg)
+• aceite oliva virgen extra hacendado → [4740] Aceite de oliva virgen extra Hacendado — 4.95€ (4.950€/L)
 ```
 
-→ basket **16.03 €** for 5 lines; a paella base for 3 ≈ **5.34 €/serving**.
+Then price the basket. `total` sums `unit_price × qty` **in integer cents** (exact; fractional
+quantities work for weight items), and basket files take inline `#` comments — so the file reads
+like the list you started with, not a wall of ids:
+
+```console
+$ mercadona total -f - <<'EOF'
+# paella base — 3 personas
+5044  1    # Arroz redondo Hacendado
+60393 1    # Gambón grande congelado
+85499 1    # Mejillón mediterráneo
+16044 1    # Tomate triturado Hacendado
+4740  0.5  # Aceite de oliva virgen extra
+EOF
+  [5044] Arroz redondo Hacendado — 1 × 1.20€ = 1.20€
+  [60393] Gambón grande congelado — 1 × 6.00€ = 6.00€
+  [85499] Mejillón mediterráneo — 1 × 5.80€ = 5.80€
+  [16044] Tomate triturado Hacendado — 1 × 0.55€ = 0.55€
+  [4740] Aceite de oliva virgen extra Hacendado — 0.5 × 4.95€ = 2.48€
+  total: 16.03€  (5 líneas)
+```
+
+→ **16.03 €** for the basket; a paella base for 3 ≈ **5.34 €/serving**. (The same `# comment`
+basket feeds `cart set-many` to fill the cart in one write; add `--json` for `{lines, total, count,
+complete}`.)
 
 ### Get the *fresh* item, not the frozen/canned one
 

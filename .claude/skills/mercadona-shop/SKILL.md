@@ -271,13 +271,19 @@ Fill the whole basket in **one write** with `set-many` — it reads the cart onc
 `<id> <qty>` line, prices the result, then issues a single PUT:
 
 ```bash
-# one '<id> <qty>' per line; qty 0 removes that line
-printf '5044 1\n37229 2\n82830.1 2\n' | mercadona cart set-many -f - --max 61
+# one '<id> <qty>' per line; qty 0 removes. Annotate each id with its name (inline '#'
+# comments are supported) so the basket stays human-readable — for you and the next agent.
+mercadona cart set-many -f - --max 61 <<'EOF'
+5044    1   # Arroz redondo Hacendado
+37229   2   # Vino blanco verdejo
+82830.1 2   # Barra de pan campesina
+EOF
 mercadona cart get                                # verify: names, qty × unit_price, total
 ```
 
-`set-many` takes the **same `<id> <qty>` lines you already fed `total`** in Gate 1, so reuse that
-file. It **prices the resulting basket before writing**, so `--max` refuses *before* it touches the
+`set-many` takes the **same annotated `<id> <qty>` lines you already fed `total`** in Gate 1, so
+reuse that file. **Always annotate ids with `# name`** — never hand a bare id list around; it's
+unreadable and a wrong id hides in plain sight. It **prices the resulting basket before writing**, so `--max` refuses *before* it touches the
 cart — a fuzzy match or fat-fingered quantity never lands. This replaces the old "one `cart add` at
 a time, verify, repeat" dance: a single PUT instead of dozens, and no write-race to nurse.
 

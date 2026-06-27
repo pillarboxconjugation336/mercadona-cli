@@ -32,7 +32,8 @@ starting with `#` are skipped. Default returns the top hit per term (`--hits` fo
   categories can let Algolia typo-match unrelated items — eyeball the result. Combine the two for
   fresh-within-a-category. Implemented as `facetFilters` (`categories.id:N`, `categories.id:-N`).
 
-`total` reads `<id> [qty]` per line (`-f <file>`/`-f -` = stdin; `#` comments skipped) — or bare
+`total` reads `<id> [qty]` per line (`-f <file>`/`-f -` = stdin; inline or whole-line `#` comments —
+so `5044 1  # Arroz redondo` is valid and self-documenting) — or bare
 ids as positional args (qty 1 each). It fetches each product's price **in the configured/`--wh`
 warehouse** and sums `unit_price × qty` in integer cents, so the pre-cart estimate is exact and
 reproducible instead of hand-added; qty may be fractional for weight/bulk items. A line whose id
@@ -136,7 +137,8 @@ every `<id> <qty>` change onto the current lines (absolute set; `0` removes), an
 `PutCart`. With a cap set it **prices the resulting basket first** (reusing prices already in the
 cart, fetching only new ids concurrently) and **refuses before writing** if the estimate exceeds
 `--max`; a final authoritative check reverts the write if the real total still breaches the cap.
-Input is `<id> <qty>` per line via `-f <file>`/`-f -` (`#` comments skipped), or positional
+Input is `<id> <qty>` per line via `-f <file>`/`-f -` (inline or whole-line `#` comments OK — annotate
+each id with its product name), or positional
 `<id> <qty> <id> <qty>…` pairs. This replaces firing many serial `add`/`set` writes.
 
 **`clear`** does one `GetCart` + `PutCart` with empty lines; prints how many products were removed
