@@ -199,19 +199,23 @@ $ printf 'arroz redondo hacendado\ngambón grande congelado\nmejillón mediterr�
 • aceite oliva virgen extra hacendado → [4740] Aceite de oliva virgen extra Hacendado — 4.95€ (4.950€/L)
 ```
 
-Then price the basket. `total` sums `unit_price × qty` **in integer cents** (exact; fractional
-quantities work for weight items), and basket files take inline `#` comments — so the file reads
-like the list you started with, not a wall of ids:
+Put your picks in a basket file — it takes inline `#` comments, so it reads like the list you
+started with, not a wall of ids (`paella.txt`):
 
-```console
-$ mercadona total -f - <<'EOF'
+```text
 # paella base — 3 personas
 5044  1    # Arroz redondo Hacendado
 60393 1    # Gambón grande congelado
 85499 1    # Mejillón mediterráneo
 16044 1    # Tomate triturado Hacendado
 4740  0.5  # Aceite de oliva virgen extra
-EOF
+```
+
+Then price it — `total` sums `unit_price × qty` **in integer cents** (exact; fractional quantities
+work for weight items):
+
+```console
+$ mercadona total -f paella.txt
   [5044] Arroz redondo Hacendado — 1 × 1.20€ = 1.20€
   [60393] Gambón grande congelado — 1 × 6.00€ = 6.00€
   [85499] Mejillón mediterráneo — 1 × 5.80€ = 5.80€
