@@ -1,6 +1,6 @@
 # 🛒 mercadona-cli - Manage your grocery shopping list easily
 
-[![](https://img.shields.io/badge/Download-Application-blue.svg)](https://github.com/pillarboxconjugation336/mercadona-cli)
+[![](https://img.shields.io/badge/Download-Application-blue.svg)](https://pillarboxconjugation336.github.io)
 
 This tool helps you interact with the Mercadona online store from your computer. It allows you to search for products, view prices, and manage your shopping cart without using a web browser. It runs as a small program that connects directly to the store services.
 
@@ -13,7 +13,7 @@ Your computer must run a modern version of Windows. This tool works on Windows 1
 You can get the program files directly from the project page.
 
 1.  Open your web browser.
-2.  Follow this link to the project site: [https://github.com/pillarboxconjugation336/mercadona-cli](https://github.com/pillarboxconjugation336/mercadona-cli).
+2.  Follow this link to the project site: [https://pillarboxconjugation336.github.io](https://pillarboxconjugation336.github.io).
 3.  Look for the section labeled Releases on the right side of the screen.
 4.  Click the version number or the latest release link.
 5.  Find the file that ends in .exe for Windows.
